@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0e14">
+<meta name="apple-mobile-web-app-title" content="Sukima家計簿">
+<title>Sukima 家計簿</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#11151f; --card:#161b27; --card2:#1d2433;
+    --line:#252c3d; --text:#eef1f7; --sub:#8a93a6; --mut:#5a6378;
+    --accent:#6c5ce7; --accent2:#8b7dff; --green:#27d39b; --red:#ff5d73;
+    --gold:#ffce5a; --radius:20px; --safe-b:env(safe-area-inset-bottom);
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f5fa; --bg2:#ffffff; --card:#ffffff; --card2:#f7f8fc;
+      --line:#e8eaf2; --text:#1a1d29; --sub:#737b8f; --mut:#9aa0b2;
+      --shadow:0 10px 30px rgba(60,70,120,.10);
+    }
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+  html,body{height:100%;overscroll-behavior:none}
+  body{background:var(--bg);color:var(--text);max-width:480px;margin:0 auto;position:relative;min-height:100vh;
+       padding-bottom:calc(86px + var(--safe-b));-webkit-user-select:none;user-select:none}
+  .hidden{display:none!important}
+  button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+
+  /* Header / balance card */
+  header{padding:calc(env(safe-area-inset-top) + 18px) 18px 8px}
+  .hello{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .hello h1{font-size:17px;font-weight:700;letter-spacing:.3px}
+  .hello .month-pick{display:flex;align-items:center;gap:8px;background:var(--card);padding:7px 12px;border-radius:99px;font-size:13px;font-weight:600;box-shadow:var(--shadow)}
+  .hello .month-pick button{padding:0 2px;color:var(--sub);font-size:16px;line-height:1}
+  .balance{background:linear-gradient(135deg,var(--accent),#5648c7 60%,#4836b8);border-radius:24px;padding:22px 22px 18px;
+           color:#fff;box-shadow:0 14px 34px rgba(108,92,231,.40);position:relative;overflow:hidden}
+  .balance::after{content:"";position:absolute;right:-40px;top:-50px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.12)}
+  .balance::before{content:"";position:absolute;right:30px;bottom:-60px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.08)}
+  .balance .lbl{font-size:12.5px;opacity:.85;letter-spacing:.5px;margin-bottom:4px}
+  .balance .amt{font-size:34px;font-weight:800;letter-spacing:.5px;font-feature-settings:"tnum"}
+  .balance .amt small{font-size:18px;font-weight:700;opacity:.8;margin-right:2px}
+  .balance .io{display:flex;gap:10px;margin-top:18px;position:relative;z-index:1}
+  .balance .io > div{flex:1;background:rgba(255,255,255,.14);border-radius:14px;padding:10px 12px;backdrop-filter:blur(4px)}
+  .balance .io .t{font-size:11px;opacity:.85;display:flex;align-items:center;gap:5px}
+  .balance .io .v{font-size:16px;font-weight:700;margin-top:3px;font-feature-settings:"tnum"}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+
+  /* Sections */
+  main{padding:6px 18px 0}
+  .sec-title{font-size:13px;font-weight:700;color:var(--sub);margin:22px 4px 12px;display:flex;justify-content:space-between;align-items:center}
+  .sec-title .link{color:var(--accent2);font-weight:600;font-size:12px}
+
+  /* Donut + breakdown */
+  .panel{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .chart-wrap{display:flex;align-items:center;gap:18px}
+  .donut{position:relative;width:118px;height:118px;flex:none}
+  .donut svg{transform:rotate(-90deg)}
+  .donut .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .donut .center .c1{font-size:10.5px;color:var(--sub)}
+  .donut .center .c2{font-size:17px;font-weight:800;font-feature-settings:"tnum"}
+  .legend{flex:1;display:flex;flex-direction:column;gap:9px;min-width:0}
+  .legend .row{display:flex;align-items:center;gap:9px;font-size:13px}
+  .legend .row .nm{flex:1;display:flex;align-items:center;gap:7px;min-width:0}
+  .legend .row .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .legend .row .pc{color:var(--sub);font-size:12px;font-weight:600;font-feature-settings:"tnum"}
+  .emoji-badge{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-size:13px;flex:none}
+
+  /* Transaction list */
+  .day-group{margin-bottom:6px}
+  .day-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 4px 8px}
+  .day-head .d{font-size:13px;font-weight:700}
+  .day-head .d small{color:var(--mut);font-weight:600;margin-left:6px;font-size:11px}
+  .day-head .sum{font-size:12.5px;color:var(--sub);font-weight:600;font-feature-settings:"tnum"}
+  .tx{display:flex;align-items:center;gap:13px;background:var(--card);padding:13px 15px;border-radius:16px;margin-bottom:8px;
+      box-shadow:var(--shadow);transition:transform .12s ease}
+  .tx:active{transform:scale(.98)}
+  .tx .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:20px;flex:none}
+  .tx .mid{flex:1;min-width:0}
+  .tx .mid .cat{font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tx .mid .memo{font-size:12px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tx .amt{font-size:15.5px;font-weight:700;font-feature-settings:"tnum";white-space:nowrap}
+  .tx .amt.exp{color:var(--text)} .tx .amt.inc{color:var(--green)}
+  .empty{text-align:center;color:var(--mut);padding:50px 20px;font-size:14px;line-height:1.9}
+  .empty .big{font-size:44px;margin-bottom:8px}
+
+  /* Bottom bar + FAB */
+  .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
+          background:var(--bg2);border-top:1px solid var(--line);display:flex;justify-content:space-around;
+          padding:8px 0 calc(8px + var(--safe-b));z-index:40}
+  .tabbar button{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--mut);font-size:10.5px;font-weight:600;flex:1;padding:4px 0}
+  .tabbar button.active{color:var(--accent)}
+  .tabbar button svg{width:23px;height:23px;stroke-width:2}
+  .tabbar .spacer{flex:1.2}
+  .fab{position:fixed;bottom:calc(30px + var(--safe-b));left:50%;transform:translateX(-50%);
+       width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));
+       color:#fff;font-size:32px;display:grid;place-items:center;box-shadow:0 10px 26px rgba(108,92,231,.55);z-index:50;
+       transition:transform .15s ease}
+  .fab:active{transform:translateX(-50%) scale(.9)}
+
+  /* Add sheet */
+  .sheet-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;opacity:0;pointer-events:none;transition:opacity .25s}
+  .sheet-mask.show{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);width:100%;max-width:480px;
+         background:var(--bg2);border-radius:26px 26px 0 0;z-index:61;transition:transform .32s cubic-bezier(.2,.9,.25,1);
+         padding:10px 18px calc(18px + var(--safe-b));max-height:94vh;overflow-y:auto}
+  .sheet.show{transform:translate(-50%,0)}
+  .grip{width:40px;height:5px;border-radius:5px;background:var(--line);margin:8px auto 14px}
+  .seg{display:flex;background:var(--card2);border-radius:14px;padding:4px;margin-bottom:18px}
+  .seg button{flex:1;padding:11px;border-radius:11px;font-size:14px;font-weight:700;color:var(--sub);transition:.2s}
+  .seg button.on-exp{background:var(--red);color:#fff;box-shadow:0 4px 12px rgba(255,93,115,.4)}
+  .seg button.on-inc{background:var(--green);color:#fff;box-shadow:0 4px 12px rgba(39,211,155,.4)}
+
+  .amount-disp{text-align:center;padding:6px 0 16px}
+  .amount-disp .yen{font-size:40px;font-weight:800;font-feature-settings:"tnum";letter-spacing:1px}
+  .amount-disp .yen .ph{color:var(--mut)}
+
+  .cats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+  .cats button{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 2px;border-radius:14px;
+               background:var(--card2);font-size:10.5px;font-weight:600;color:var(--sub);transition:.15s;border:2px solid transparent}
+  .cats button .e{font-size:22px}
+  .cats button.sel{border-color:var(--accent);color:var(--text);background:var(--card)}
+
+  .field{display:flex;gap:10px;margin-bottom:14px}
+  .field input{flex:1;background:var(--card2);border-radius:13px;padding:13px 15px;font-size:14px;color:var(--text);border:1px solid var(--line)}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .field input[type=date]{flex:none;width:148px}
+
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+  .keypad button{background:var(--card2);border-radius:14px;padding:16px;font-size:21px;font-weight:700;transition:.1s}
+  .keypad button:active{background:var(--accent);color:#fff;transform:scale(.95)}
+  .keypad button.fn{font-size:16px;color:var(--sub)}
+  .save-btn{width:100%;padding:16px;border-radius:16px;background:linear-gradient(135deg,var(--accent2),var(--accent));
+            color:#fff;font-size:16px;font-weight:800;box-shadow:0 8px 20px rgba(108,92,231,.45);transition:.15s}
+  .save-btn:active{transform:scale(.98)}
+  .save-btn:disabled{opacity:.45;box-shadow:none}
+
+  /* Stats page */
+  .stat-cards{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:6px}
+  .stat-card{background:var(--card);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+  .stat-card .k{font-size:11.5px;color:var(--sub);font-weight:600}
+  .stat-card .v{font-size:22px;font-weight:800;margin-top:5px;font-feature-settings:"tnum"}
+  .stat-card .s{font-size:11px;color:var(--mut);margin-top:3px}
+  .bars{display:flex;align-items:flex-end;gap:7px;height:140px;padding:10px 4px 0}
+  .bars .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+  .bars .b .bar{width:100%;max-width:26px;border-radius:7px 7px 3px 3px;background:linear-gradient(180deg,var(--accent2),var(--accent));min-height:3px;transition:height .5s cubic-bezier(.2,.9,.25,1)}
+  .bars .b .bl{font-size:9.5px;color:var(--mut);font-weight:600}
+  .bars .b.cur .bar{background:linear-gradient(180deg,var(--gold),#f0a93a)}
+  .cat-rank{display:flex;flex-direction:column;gap:11px;margin-top:6px}
+  .cat-rank .r{display:flex;align-items:center;gap:11px}
+  .cat-rank .r .nm{font-size:13.5px;font-weight:600;width:74px;display:flex;align-items:center;gap:7px;flex:none}
+  .cat-rank .r .track{flex:1;height:9px;background:var(--card2);border-radius:9px;overflow:hidden}
+  .cat-rank .r .track i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .cat-rank .r .vl{font-size:12px;font-weight:700;color:var(--sub);width:64px;text-align:right;font-feature-settings:"tnum"}
+
+  .toast{position:fixed;bottom:calc(110px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(20px);
+         background:var(--text);color:var(--bg);padding:11px 22px;border-radius:99px;font-size:13.5px;font-weight:700;
+         z-index:80;opacity:0;transition:.3s;box-shadow:0 8px 22px rgba(0,0,0,.3);white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .page{animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .del-hint{text-align:center;font-size:11px;color:var(--mut);padding:4px 0 18px}
+</style>
+</head>
+<body>
+
+<!-- ===== HOME ===== -->
+<div id="page-home" class="page">
+  <header>
+    <div class="hello">
+      <h1 id="greet">こんにちは 👋</h1>
+      <div class="month-pick">
+        <button onclick="shiftMonth(-1)">‹</button>
+        <span id="monthLabel">2026年6月</span>
+        <button onclick="shiftMonth(1)">›</button>
+      </div>
+    </div>
+    <div class="balance">
+      <div class="lbl">今月の収支バランス</div>
+      <div class="amt"><small>¥</small><span id="balanceVal">0</span></div>
+      <div class="io">
+        <div>
+          <div class="t"><span class="dot" style="background:var(--green)"></span>収入</div>
+          <div class="v" id="incVal">¥0</div>
+        </div>
+        <div>
+          <div class="t"><span class="dot" style="background:#ffd2d8"></span>支出</div>
+          <div class="v" id="expVal">¥0</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="sec-title">支出の内訳</div>
+    <div class="panel" id="breakdownPanel">
+      <div class="chart-wrap">
+        <div class="donut">
+          <svg width="118" height="118" viewBox="0 0 118 118">
+            <circle cx="59" cy="59" r="48" fill="none" stroke="var(--card2)" stroke-width="13"/>
+            <g id="donutSegs"></g>
+          </svg>
+          <div class="center"><div class="c1">支出合計</div><div class="c2" id="donutTotal">¥0</div></div>
+        </div>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+
+    <div class="sec-title">取引履歴 <span class="link" id="txCount"></span></div>
+    <div id="txList"></div>
+  </main>
+</div>
+
+<!-- ===== STATS ===== -->
+<div id="page-stats" class="page hidden">
+  <header>
+    <div class="hello"><h1>分析 📊</h1>
+      <div class="month-pick">
+        <button onclick="shiftMonth(-1)">‹</button>
+        <span id="monthLabel2">2026年6月</span>
+        <button onclick="shiftMonth(1)">›</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <div class="stat-cards">
+      <div class="stat-card"><div class="k">1日あたり支出</div><div class="v" id="perDay">¥0</div><div class="s" id="perDaySub">今月平均</div></div>
+      <div class="stat-card"><div class="k">最大支出カテゴリ</div><div class="v" id="topCat" style="font-size:18px">—</div><div class="s" id="topCatSub"></div></div>
+    </div>
+    <div class="sec-title">月別の支出推移</div>
+    <div class="panel"><div class="bars" id="monthBars"></div></div>
+    <div class="sec-title">カテゴリ別ランキング</div>
+    <div class="panel"><div class="cat-rank" id="catRank"></div></div>
+    <div class="sec-title">データ</div>
+    <div class="panel" style="display:flex;gap:10px">
+      <button class="save-btn" style="background:var(--card2);color:var(--text);box-shadow:none" onclick="exportCSV()">⬇️ CSV書き出し</button>
+      <button class="save-btn" style="background:var(--card2);color:var(--red);box-shadow:none" onclick="resetAll()">🗑 全削除</button>
+    </div>
+    <div class="del-hint">データはこの端末の中だけに保存されます（外部送信なし）</div>
+  </main>
+</div>
+
+<!-- ===== TABBAR ===== -->
+<nav class="tabbar">
+  <button id="tab-home" class="active" onclick="go('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 11l9-8 9 8M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9"/></svg>ホーム</button>
+  <div class="spacer"></div>
+  <button id="tab-stats" onclick="go('stats')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>分析</button>
+</nav>
+<button class="fab" onclick="openSheet()">＋</button>
+
+<!-- ===== ADD SHEET ===== -->
+<div class="sheet-mask" id="mask" onclick="closeSheet()"></div>
+<div class="sheet" id="sheet">
+  <div class="grip"></div>
+  <div class="seg">
+    <button id="segExp" class="on-exp" onclick="setType('exp')">支出</button>
+    <button id="segInc" onclick="setType('inc')">収入</button>
+  </div>
+  <div class="amount-disp"><div class="yen"><span id="amtView" class="ph">0</span> 円</div></div>
+  <div class="cats" id="catGrid"></div>
+  <div class="field">
+    <input type="text" id="memoInput" placeholder="メモ（任意）" maxlength="40">
+    <input type="date" id="dateInput">
+  </div>
+  <div class="keypad">
+    <button onclick="key('7')">7</button><button onclick="key('8')">8</button><button onclick="key('9')">9</button>
+    <button onclick="key('4')">4</button><button onclick="key('5')">5</button><button onclick="key('6')">6</button>
+    <button onclick="key('1')">1</button><button onclick="key('2')">2</button><button onclick="key('3')">3</button>
+    <button class="fn" onclick="key('000')">000</button><button onclick="key('0')">0</button><button class="fn" onclick="key('back')">⌫</button>
+  </div>
+  <button class="save-btn" id="saveBtn" onclick="save()" disabled>保存する</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== data ===== */
+const CATS = {
+  exp:[
+    {id:'food',  n:'食費',   e:'🍚', c:'#ff7a59'},
+    {id:'cafe',  n:'カフェ', e:'☕', c:'#c98b4b'},
+    {id:'daily', n:'日用品', e:'🧴', c:'#4cc9f0'},
+    {id:'trans', n:'交通',   e:'🚃', c:'#4895ef'},
+    {id:'fun',   n:'娯楽',   e:'🎮', c:'#b5179e'},
+    {id:'beer',  n:'お酒',   e:'🍺', c:'#f4a259'},
+    {id:'cloth', n:'服・美容',e:'👕', c:'#f72585'},
+    {id:'home',  n:'住居',   e:'🏠', c:'#560bad'},
+    {id:'health',n:'健康',   e:'💊', c:'#43aa8b'},
+    {id:'etc',   n:'その他', e:'📦', c:'#8a93a6'},
+  ],
+  inc:[
+    {id:'salary',n:'給料',   e:'💰', c:'#27d39b'},
+    {id:'side',  n:'副業',   e:'💻', c:'#4cc9f0'},
+    {id:'bonus', n:'臨時収入',e:'🎁', c:'#ffce5a'},
+    {id:'etc_i', n:'その他', e:'📥', c:'#8a93a6'},
+  ]
+};
+const catMap = {};
+[...CATS.exp,...CATS.inc].forEach(c=>catMap[c.id]=c);
+
+const KEY='sukima_kakeibo_v1';
+/* ストレージ: localStorageが使えればそれを使い、ダメなら(サンドボックス/プライベート/file://)メモリ保存に自動フォールバック */
+let LS=null; try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); LS=localStorage; }catch(e){}
+const mem={};
+const store={ get:k=> LS?LS.getItem(k):(k in mem?mem[k]:null),
+              set:(k,v)=>{ try{ if(LS)LS.setItem(k,v); else mem[k]=v; }catch(e){ mem[k]=v; } } };
+
+let txs = load();
+let viewMonth = new Date(); viewMonth.setDate(1);
+let draft = {type:'exp', amount:0, cat:'food', memo:'', date:todayStr()};
+
+function load(){ try{return JSON.parse(store.get(KEY))||[]}catch(e){return[]} }
+function persist(){ try{ store.set(KEY, JSON.stringify(txs)); }catch(e){} }
+function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function yen(n){ return '¥'+Math.round(n).toLocaleString('ja-JP'); }
+function ym(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function inMonth(t){ return t.date.slice(0,7)===ym(viewMonth); }
+
+/* ===== render ===== */
+function render(){
+  const lbl = viewMonth.getFullYear()+'年'+(viewMonth.getMonth()+1)+'月';
+  monthLabel.textContent = lbl; monthLabel2.textContent = lbl;
+  const h=new Date().getHours();
+  greet.textContent = (h<5?'こんばんは 🌙':h<11?'おはよう ☀️':h<18?'こんにちは 👋':'おつかれさま 🌆');
+
+  const mtx = txs.filter(inMonth);
+  const inc = mtx.filter(t=>t.type==='inc').reduce((s,t)=>s+t.amount,0);
+  const exp = mtx.filter(t=>t.type==='exp').reduce((s,t)=>s+t.amount,0);
+  balanceVal.textContent = (inc-exp).toLocaleString('ja-JP');
+  incVal.textContent = yen(inc); expVal.textContent = yen(exp);
+
+  renderDonut(mtx, exp);
+  renderList(mtx);
+  renderStats();
+}
+
+function renderDonut(mtx, exp){
+  const by={};
+  mtx.filter(t=>t.type==='exp').forEach(t=>by[t.cat]=(by[t.cat]||0)+t.amount);
+  const arr=Object.entries(by).map(([id,v])=>({...catMap[id],v})).sort((a,b)=>b.v-a.v);
+  donutTotal.textContent = yen(exp);
+  const segs=document.getElementById('donutSegs'); segs.innerHTML='';
+  const C=2*Math.PI*48; let off=0;
+  if(exp>0){
+    arr.forEach(a=>{
+      const frac=a.v/exp, len=frac*C;
+      const el=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      el.setAttribute('cx',59);el.setAttribute('cy',59);el.setAttribute('r',48);
+      el.setAttribute('fill','none');el.setAttribute('stroke',a.c);el.setAttribute('stroke-width',13);
+      el.setAttribute('stroke-dasharray',`${len} ${C-len}`);
+      el.setAttribute('stroke-dashoffset',-off);
+      segs.appendChild(el); off+=len;
+    });
+  }
+  legend.innerHTML = arr.length? arr.slice(0,5).map(a=>`
+    <div class="row"><div class="nm"><span class="emoji-badge" style="background:${a.c}22">${a.e}</span><span>${a.n}</span></div>
+    <div class="pc">${Math.round(a.v/exp*100)}%</div></div>`).join('')
+    : `<div style="color:var(--mut);font-size:13px">まだ支出がありません</div>`;
+}
+
+function renderList(mtx){
+  txCount.textContent = mtx.length? mtx.length+'件' : '';
+  if(!mtx.length){ txList.innerHTML=`<div class="empty"><div class="big">🌱</div>今月の記録はまだありません<br>右下の ＋ から追加しよう</div>`; return; }
+  const byDay={};
+  mtx.forEach(t=>(byDay[t.date]=byDay[t.date]||[]).push(t));
+  const days=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
+  const wd=['日','月','火','水','木','金','土'];
+  txList.innerHTML = days.map(d=>{
+    const list=byDay[d].sort((a,b)=>b.id-a.id);
+    const dExp=list.filter(t=>t.type==='exp').reduce((s,t)=>s+t.amount,0);
+    const dt=new Date(d+'T00:00');
+    return `<div class="day-group">
+      <div class="day-head"><div class="d">${dt.getMonth()+1}/${dt.getDate()}<small>${wd[dt.getDay()]}曜日</small></div>
+      <div class="sum">${dExp?'−'+yen(dExp):''}</div></div>
+      ${list.map(t=>{const c=catMap[t.cat]||catMap.etc;return `
+        <div class="tx" onclick="delTx(${t.id})">
+          <div class="ic" style="background:${c.c}22">${c.e}</div>
+          <div class="mid"><div class="cat">${c.n}</div>${t.memo?`<div class="memo">${esc(t.memo)}</div>`:''}</div>
+          <div class="amt ${t.type}">${t.type==='inc'?'+':'−'}${yen(t.amount)}</div>
+        </div>`}).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderStats(){
+  const mtx=txs.filter(inMonth);
+  const exp=mtx.filter(t=>t.type==='exp').reduce((s,t)=>s+t.amount,0);
+  const now=new Date();
+  const isCur = ym(viewMonth)===ym(now);
+  const days = isCur? now.getDate() : new Date(viewMonth.getFullYear(),viewMonth.getMonth()+1,0).getDate();
+  perDay.textContent = yen(exp/Math.max(days,1));
+  perDaySub.textContent = isCur?`${days}日経過 / 月平均ペース`:'月平均';
+
+  const by={};
+  mtx.filter(t=>t.type==='exp').forEach(t=>by[t.cat]=(by[t.cat]||0)+t.amount);
+  const arr=Object.entries(by).map(([id,v])=>({...catMap[id],v})).sort((a,b)=>b.v-a.v);
+  if(arr.length){ topCat.textContent=arr[0].e+' '+arr[0].n; topCatSub.textContent=yen(arr[0].v)+' ('+Math.round(arr[0].v/exp*100)+'%)'; }
+  else { topCat.textContent='—'; topCatSub.textContent='データなし'; }
+
+  // 6-month bars
+  const months=[]; for(let i=5;i>=0;i--){const d=new Date(viewMonth);d.setMonth(d.getMonth()-i);months.push(d);}
+  const sums=months.map(d=>txs.filter(t=>t.type==='exp'&&t.date.slice(0,7)===ym(d)).reduce((s,t)=>s+t.amount,0));
+  const mx=Math.max(...sums,1);
+  monthBars.innerHTML=months.map((d,i)=>`
+    <div class="b ${ym(d)===ym(viewMonth)?'cur':''}">
+      <div class="bar" style="height:${Math.max(sums[i]/mx*100,2)}%"></div>
+      <div class="bl">${d.getMonth()+1}月</div>
+    </div>`).join('');
+
+  catRank.innerHTML = arr.length? arr.map(a=>`
+    <div class="r"><div class="nm"><span>${a.e}</span><span>${a.n}</span></div>
+      <div class="track"><i style="width:${a.v/arr[0].v*100}%"></i></div>
+      <div class="vl">${yen(a.v)}</div></div>`).join('')
+    : `<div style="color:var(--mut);font-size:13px;text-align:center;padding:14px">データがありません</div>`;
+}
+
+/* ===== sheet / input ===== */
+function openSheet(){
+  draft={type:'exp',amount:0,cat:'food',memo:'',date:todayStr()};
+  dateInput.value=draft.date; memoInput.value='';
+  setType('exp'); renderCats(); updateAmt();
+  mask.classList.add('show'); sheet.classList.add('show');
+}
+function closeSheet(){ mask.classList.remove('show'); sheet.classList.remove('show'); }
+function setType(t){
+  draft.type=t; draft.cat=CATS[t][0].id;
+  segExp.className=t==='exp'?'on-exp':''; segInc.className=t==='inc'?'on-inc':'';
+  renderCats();
+}
+function renderCats(){
+  catGrid.innerHTML=CATS[draft.type].map(c=>`
+    <button class="${c.id===draft.cat?'sel':''}" onclick="pickCat('${c.id}')">
+      <span class="e">${c.e}</span>${c.n}</button>`).join('');
+}
+function pickCat(id){ draft.cat=id; renderCats(); }
+function key(k){
+  if(k==='back') draft.amount=Math.floor(draft.amount/10);
+  else if(k==='000') draft.amount=Math.min(draft.amount*1000,9999999);
+  else draft.amount=Math.min(draft.amount*10+(+k),9999999);
+  updateAmt();
+}
+function updateAmt(){
+  amtView.textContent = draft.amount? draft.amount.toLocaleString('ja-JP') : '0';
+  amtView.className = draft.amount? '' : 'ph';
+  saveBtn.disabled = !draft.amount;
+}
+function save(){
+  if(!draft.amount) return;
+  txs.push({id:Date.now(),type:draft.type,cat:draft.cat,amount:draft.amount,
+            memo:memoInput.value.trim(),date:dateInput.value||todayStr()});
+  persist();
+  // jump to the month we just added into
+  viewMonth=new Date((dateInput.value||todayStr())+'T00:00'); viewMonth.setDate(1);
+  closeSheet(); render();
+  toast(draft.type==='inc'?'収入を記録しました 💰':'支出を記録しました ✏️');
+}
+function delTx(id){
+  const t=txs.find(x=>x.id===id); if(!t) return;
+  const c=catMap[t.cat]||catMap.etc;
+  if(confirm(`この記録を削除しますか？\n\n${c.e} ${c.n}  ${t.type==='inc'?'+':'−'}${yen(t.amount)}\n${t.date}${t.memo?'  '+t.memo:''}`)){
+    txs=txs.filter(x=>x.id!==id); persist(); render(); toast('削除しました');
+  }
+}
+
+/* ===== nav ===== */
+function go(p){
+  ['home','stats'].forEach(x=>{
+    document.getElementById('page-'+x).classList.toggle('hidden',x!==p);
+    document.getElementById('tab-'+x).classList.toggle('active',x===p);
+  });
+  document.getElementById('page-'+p).classList.remove('page');void document.getElementById('page-'+p).offsetWidth;
+  document.getElementById('page-'+p).classList.add('page');
+  window.scrollTo(0,0);
+}
+function shiftMonth(d){ viewMonth.setMonth(viewMonth.getMonth()+d); render(); }
+
+/* ===== data ops ===== */
+function exportCSV(){
+  if(!txs.length){ toast('データがありません'); return; }
+  const rows=[['日付','種別','カテゴリ','金額','メモ']];
+  txs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
+    const c=catMap[t.cat]||catMap.etc;
+    rows.push([t.date, t.type==='inc'?'収入':'支出', c.n, t.amount, t.memo||'']);
+  });
+  const csv='﻿'+rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`家計簿_${ym(viewMonth)}.csv`; a.click();
+  toast('CSVを書き出しました ⬇️');
+}
+function resetAll(){
+  if(confirm('すべての記録を削除します。\nこの操作は元に戻せません。よろしいですか？')){
+    txs=[]; persist(); render(); toast('全データを削除しました');
+  }
+}
+
+/* ===== util ===== */
+let toastTimer;
+function toast(msg){
+  const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* demo seed on first launch */
+if(!txs.length && !store.get('sukima_seeded')){
+  const t=new Date(); const ds=n=>{const d=new Date(t);d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+  txs=[
+    {id:1,type:'inc',cat:'salary',amount:240000,memo:'6月分',date:ds(20)},
+    {id:2,type:'exp',cat:'food',amount:680,memo:'コンビニ',date:ds(0)},
+    {id:3,type:'exp',cat:'beer',amount:1200,memo:'クラフトビール',date:ds(0)},
+    {id:4,type:'exp',cat:'cafe',amount:520,memo:'',date:ds(1)},
+    {id:5,type:'exp',cat:'food',amount:3200,memo:'スーパー',date:ds(2)},
+    {id:6,type:'exp',cat:'trans',amount:1320,memo:'',date:ds(3)},
+    {id:7,type:'exp',cat:'fun',amount:2800,memo:'映画＋グッズ',date:ds(4)},
+    {id:8,type:'exp',cat:'home',amount:65000,memo:'家賃',date:ds(5)},
+    {id:9,type:'inc',cat:'side',amount:35000,memo:'制作案件',date:ds(6)},
+  ];
+  store.set('sukima_seeded','1'); persist();
+}
+
+/* 保存が永続化されない環境(プレビュー/プライベート等)では一言知らせる。実機ブラウザでは出ない */
+if(!LS){
+  const b=document.createElement('div');
+  b.style.cssText='position:fixed;top:0;left:50%;transform:translateX(-50%);max-width:480px;width:100%;'
+    +'background:var(--gold);color:#3a2c00;font-size:11.5px;font-weight:700;text-align:center;'
+    +'padding:5px 10px;z-index:90;line-height:1.4';
+  b.innerHTML='⚠️ この表示環境では保存が一時的です（リロードで消えます）。スマホのブラウザで開けば保存されます';
+  b.onclick=()=>b.remove();
+  document.body.appendChild(b);
+}
+
+render();
+</script>
+
+<script>
+/* Service Worker登録: https または localhost でのみ有効。file://やプレビューでは静かに失敗(無害) */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
