@@ -1,7 +1,7 @@
 /* Sukima 家計簿 - Service Worker
-   オフライン動作用。アプリ本体をキャッシュし、ネットが無くても起動できるようにする。
-   バージョンを上げると古いキャッシュを破棄して更新される。 */
-const CACHE = 'sukima-kakeibo-v1';
+   HTMLは常に最新を取りに行き(network-first)、アイコン等のアセットは
+   キャッシュ優先(cache-first)。CACHE のバージョンを上げると古いキャッシュを破棄して更新。 */
+const CACHE = 'sukima-kakeibo-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -27,20 +27,37 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request)
+  const req = e.request;
+  if (req.method !== 'GET') return;
+
+  const isHTML = req.mode === 'navigate' ||
+                 (req.headers.get('accept') || '').includes('text/html');
+
+  if (isHTML) {
+    // HTML は network-first: オンラインなら常に最新、オフライン時のみキャッシュへフォールバック
+    e.respondWith(
+      fetch(req)
         .then((resp) => {
-          // 取得できたら同一オリジンのものはキャッシュへ追加
-          if (resp && resp.status === 200 && resp.type === 'basic') {
-            const copy = resp.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-          }
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
           return resp;
         })
-        .catch(() => caches.match('./index.html')); // オフライン時のフォールバック
+        .catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // その他アセットは cache-first: 速く、オフラインでも動く
+  e.respondWith(
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((resp) => {
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return resp;
+      });
     })
   );
 });
